@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>My Album Rating Mode</title>
+<style>
+  :root {
+    --bg: #121212; --panel: #1e1e1e; --panel2: #2a2a2a; --text: #f2f2f2; --muted: #a0a0a0;
+    --green: #1db954; --green2: #17a349; --red: #e5484d; --amber: #f5b301; --line: #333;
+    --r1: #6b6b6b; --r2: #4f7cff; --r3: #29b6a6; --r4: #f5b301; --r5: #ff7a1a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  button { font: inherit; color: inherit; border: 0; background: var(--panel2); border-radius: 12px; padding: 12px 16px; cursor: pointer; }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: default; transform: none; }
+  button.primary { background: var(--green); color: #000; font-weight: 700; }
+  button.danger { background: #3a1d1f; color: #ff8a8e; }
+  input, select { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+  header { position: sticky; top: 0; z-index: 5; background: rgba(18,18,18,.92); backdrop-filter: blur(10px); padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  main { max-width: 640px; margin: 0 auto; padding: 14px 16px 24px; }
+  .card { background: var(--panel); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row.wrap { flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .hidden { display: none !important; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
+  .tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #181818; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 6; }
+  .tabs button { flex: 1; background: transparent; border-radius: 0; padding: 12px 4px 10px; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .tabs button .ic { font-size: 20px; line-height: 1; }
+  .tabs button.active { color: var(--green); }
+  .stat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat div { background: var(--panel2); border-radius: 12px; padding: 10px; text-align: center; }
+  .stat b { display: block; font-size: 22px; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .art { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; background: #000; display: block; max-height: 46vh; margin: 0 auto; }
+  .np-title { font-size: 21px; font-weight: 700; margin: 12px 0 2px; line-height: 1.2; }
+  .np-artist { color: var(--muted); font-size: 15px; }
+  .np-album { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .progress { height: 4px; background: #3a3a3a; border-radius: 2px; margin: 12px 0 6px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--green); transition: width .5s linear; }
+  .times { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+  .ratebar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+  .ratebar button { padding: 18px 0; font-size: 22px; font-weight: 800; border-radius: 14px; background: var(--panel2); position: relative; }
+  .ratebar button small { display: block; font-size: 10px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+  .ratebar button.r1 { box-shadow: inset 0 -4px 0 var(--r1); }
+  .ratebar button.r2 { box-shadow: inset 0 -4px 0 var(--r2); }
+  .ratebar button.r3 { box-shadow: inset 0 -4px 0 var(--r3); }
+  .ratebar button.r4 { box-shadow: inset 0 -4px 0 var(--r4); }
+  .ratebar button.r5 { box-shadow: inset 0 -4px 0 var(--r5); }
+  .ratebar button.sel { outline: 3px solid var(--green); }
+  .controls { display: flex; gap: 10px; margin-top: 12px; }
+  .controls button { flex: 1; padding: 14px; font-size: 15px; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; background: var(--panel2); font-size: 12px; color: var(--muted); }
+  .pill.on { background: #173d25; color: #7fe0a0; }
+  .list { display: flex; flex-direction: column; gap: 6px; }
+  .item { display: flex; gap: 10px; align-items: center; background: var(--panel2); border-radius: 12px; padding: 8px 10px; }
+  .item img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #000; }
+  .item .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .a { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .info { flex: 1; min-width: 0; }
+  .badge { font-weight: 800; font-size: 14px; padding: 4px 8px; border-radius: 8px; background: #333; min-width: 34px; text-align: center; }
+  .badge.r1 { color: #ddd; } .badge.r2 { color: var(--r2); } .badge.r3 { color: var(--r3); } .badge.r4 { color: var(--r4); } .badge.r5 { color: var(--r5); }
+  .toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: #2e2e2e; color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; opacity: 0; transition: opacity .2s; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.4); max-width: 90vw; text-align: center; }
+  .toast.show { opacity: 1; }
+  .center { text-align: center; }
+  .big { font-size: 26px; font-weight: 800; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #555; border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .seg { display: flex; background: var(--panel2); border-radius: 12px; padding: 4px; }
+  .seg button { flex: 1; background: transparent; padding: 10px; border-radius: 9px; font-size: 14px; }
+  .seg button.on { background: #3a3a3a; }
+  code { background: #000; padding: 2px 6px; border-radius: 6px; font-size: 12px; word-break: break-all; }
+  a { color: #8ecbff; }
+  .filterbar { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .filterbar button { padding: 8px 12px; border-radius: 999px; font-size: 13px; white-space: nowrap; }
+  .filterbar button.on { background: var(--green); color: #000; font-weight: 700; }
+  .mini-rate { display: flex; gap: 4px; }
+  .mini-rate button { padding: 6px 0; width: 30px; font-size: 13px; font-weight: 700; border-radius: 8px; }
+  .mini-rate button.on { background: var(--green); color: #000; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>My Album Rating Mode</h1>
+    <div class="sub" id="hdrSub">Not connected</div>
+  </div>
+  <div id="hdrRight"><span class="pill" id="modePill">Idle</span></div>
+</header>
+
+<main>
+
+  <!-- SETUP / LOGIN -->
+  <section id="viewLogin" class="card hidden">
+    <div class="center" style="padding: 10px 0 6px;">
+      <div style="font-size:54px">🎧</div>
+      <div class="big">Rate every song in your albums</div>
+      <p class="muted">Plays only songs from albums saved in your Spotify library, one unrated song at a time. Rate it 1–5 and it moves on. Ratings are stored as five Spotify playlists (★1–★5), so they sync everywhere and can never be lost.</p>
+    </div>
+    <button class="primary" style="width:100%; padding:16px; font-size:16px;" onclick="login()">Connect Spotify</button>
+    <details style="margin-top:14px" class="small muted">
+      <summary>Setup / advanced</summary>
+      <p>Spotify app Client ID:</p>
+      <input id="clientIdInput" placeholder="Client ID from developer.spotify.com">
+      <p>This page's redirect URI (must be added in your Spotify app settings, exactly):</p>
+      <p><code id="redirectUriShow"></code></p>
+      <button onclick="saveClientId()">Save</button>
+    </details>
+  </section>
+
+  <!-- RATE VIEW -->
+  <section id="viewRate" class="hidden">
+    <div class="card" id="loadingCard">
+      <div><span class="spinner"></span><span id="loadingText">Loading your albums…</span></div>
+      <div class="progress"><i id="loadBar"></i></div>
+    </div>
+
+    <div class="card" id="statsCard">
+      <div class="stat">
+        <div><b id="stTotal">–</b><span>songs in albums</span></div>
+        <div><b id="stRated">–</b><span>rated</span></div>
+        <div><b id="stLeft">–</b><span>left to rate</span></div>
+      </div>
+      <div class="progress" style="margin-top:12px"><i id="ratedBar"></i></div>
+    </div>
+
+    <div class="card" id="startCard">
+      <h2>Rating mode</h2>
+      <div class="seg" style="margin-bottom:10px">
+        <button id="ordShuffle" class="on" onclick="setOrder('shuffle')">🔀 Shuffle songs</button>
+        <button id="ordAlbum" onclick="setOrder('album')">💿 Album by album</button>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <select id="deviceSel" class="grow"></select>
+        <button onclick="loadDevices(true)" title="Refresh devices">↻</button>
+      </div>
+      <p class="small muted" id="deviceHint">Open Spotify on the device you want to hear (phone, computer, speaker), then pick it here.</p>
+      <button class="primary" style="width:100%; padding:16px; font-size:16px;" id="btnStart" onclick="startRatingMode()">▶ Start rating mode</button>
+    </div>
+
+    <div class="card" id="npCard">
+      <div class="row" style="justify-content:space-between; margin-bottom:10px">
+        <h2 style="margin:0" id="npHeading">Now playing</h2>
+        <button class="small danger hidden" id="btnStop" onclick="stopRatingMode()">■ Stop rating mode</button>
+      </div>
+      <img class="art" id="npArt" alt="">
+      <div class="np-title" id="npTitle">Nothing playing</div>
+      <div class="np-artist" id="npArtist"></div>
+      <div class="np-album" id="npAlbum"></div>
+      <div class="progress"><i id="npBar"></i></div>
+      <div class="times"><span id="npCur">0:00</span><span id="npDur">0:00</span></div>
+      <div class="small muted" id="npStatus" style="margin-top:6px"></div>
+
+      <div class="ratebar" id="rateBar">
+        <button class="r1" onclick="rateCurrent(1)">1<small>meh</small></button>
+        <button class="r2" onclick="rateCurrent(2)">2<small>ok</small></button>
+        <button class="r3" onclick="rateCurrent(3)">3<small>good</small></button>
+        <button class="r4" onclick="rateCurrent(4)">4<small>great</small></button>
+        <button class="r5" onclick="rateCurrent(5)">5<small>love</small></button>
+      </div>
+      <div class="controls">
+        <button onclick="togglePlay()" id="btnPlay">⏯</button>
+        <button onclick="seekBack()" title="Back 15s">↺ 15s</button>
+        <button onclick="skipNoRate()" id="btnSkip">Skip, rate later ⏭</button>
+      </div>
+      <div class="row" style="margin-top:10px; justify-content:space-between">
+        <button class="small" onclick="undoLast()" id="btnUndo" disabled>↩ Undo last rating</button>
+        <span class="small muted" id="queueInfo"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAYLISTS VIEW -->
+  <section id="viewPlaylists" class="hidden">
+    <div class="card">
+      <h2>Your rating playlists</h2>
+      <p class="small muted">These live in your Spotify library and update the moment you rate a song. Play them anywhere.</p>
+      <div class="list" id="ratingPlaylists"></div>
+    </div>
+    <div class="card">
+      <h2>Combined playlists</h2>
+      <p class="small muted">Build (or refresh) playlists that combine several ratings. Tap again anytime to sync them with your latest ratings.</p>
+      <div class="list">
+        <div class="item"><div class="info"><div class="t">My Albums ★4+</div><div class="a">Songs rated 4 or 5</div></div><button class="primary small" onclick="buildCombo(4)">Sync</button></div>
+        <div class="item"><div class="info"><div class="t">My Albums ★3+</div><div class="a">Songs rated 3, 4 or 5</div></div><button class="primary small" onclick="buildCombo(3)">Sync</button></div>
+        <div class="item"><div class="info"><div class="t">My Albums ★5 Shuffle Mix</div><div class="a">Only the 5s, freshly shuffled</div></div><button class="primary small" onclick="buildCombo(5, true)">Sync</button></div>
+      </div>
+      <div class="small muted" id="comboStatus" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- LIBRARY / RATED VIEW -->
+  <section id="viewLibrary" class="hidden">
+    <div class="card">
+      <h2>Rated songs</h2>
+      <div class="filterbar">
+        <button class="on" onclick="setFilter('all', this)">All rated</button>
+        <button onclick="setFilter(5, this)">★5</button>
+        <button onclick="setFilter(4, this)">★4</button>
+        <button onclick="setFilter(3, this)">★3</button>
+        <button onclick="setFilter(2, this)">★2</button>
+        <button onclick="setFilter(1, this)">★1</button>
+        <button onclick="setFilter('unrated', this)">Unrated</button>
+      </div>
+      <input id="searchBox" placeholder="Search song, artist or album…" oninput="renderLibrary()" style="margin-bottom:10px">
+      <div class="list" id="libList"></div>
+      <div class="center small muted" id="libMore" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS VIEW -->
+  <section id="viewSettings" class="hidden">
+    <div class="card">
+      <h2>Account</h2>
+      <div id="acctInfo" class="small muted"></div>
+      <div class="row" style="margin-top:10px">
+        <button onclick="refreshLibrary()" class="grow">↻ Reload albums from Spotify</button>
+        <button onclick="logout()" class="danger">Sign out</button>
+      </div>
+      <p class="small muted">Reload after you save new albums to your Spotify library. Ratings are re-read from your playlists every time the app opens.</p>
+    </div>
+    <div class="card">
+      <h2>Behaviour</h2>
+      <label class="row" style="margin-bottom:10px"><input type="checkbox" id="optSkipRated" style="width:auto" onchange="saveOpts()"> <span>In rating mode, never play songs already rated</span></label>
+      <label class="row" style="margin-bottom:10px"><input type="checkbox" id="optAutoNext" style="width:auto" onchange="saveOpts()"> <span>Jump to the next song right after rating</span></label>
+      <label class="row"><input type="checkbox" id="optDedupe" style="width:auto" onchange="saveOpts()"> <span>Treat the same song on different editions (deluxe/remaster) as one</span></label>
+    </div>
+    <div class="card">
+      <h2>Spotify app</h2>
+      <p class="small">Client ID</p>
+      <input id="clientIdInput2">
+      <p class="small">Redirect URI registered for this page:</p>
+      <p><code id="redirectUriShow2"></code></p>
+      <button onclick="saveClientId(true)">Save</button>
+    </div>
+    <div class="card small muted">
+      <b>How it works.</b> Songs come from albums saved in <i>Your Library → Albums</i>. Ratings are stored as five private playlists named “My Ratings ★1” … “My Ratings ★5”. A song is “rated” if it's in any of them — so you can even rate from the Spotify app by dragging a song into one of those playlists. Playback uses Spotify Connect, so music plays on whatever device you pick and this page is just the remote.
+      <div style="margin-top:8px">Version 1.0</div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs" id="tabs">
+  <button data-view="Rate" class="active" onclick="showView('Rate')"><span class="ic">★</span>Rate</button>
+  <button data-view="Playlists" onclick="showView('Playlists')"><span class="ic">🎵</span>Playlists</button>
+  <button data-view="Library" onclick="showView('Library')"><span class="ic">📚</span>Songs</button>
+  <button data-view="Settings" onclick="showView('Settings')"><span class="ic">⚙️</span>Settings</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   My Album Rating Mode — single-file Spotify Connect rater
+   Uses the Spotify Web API as of the February 2026 migration.
+   ========================================================= */
+
+const DEFAULT_CLIENT_ID = '4866fd618022439bb34b3393fece1af5';
+const SCOPES = 'user-library-read user-read-playback-state user-modify-playback-state playlist-read-private playlist-modify-private playlist-modify-public';
+const RATING_NAMES = {1:'My Ratings ★1', 2:'My Ratings ★2', 3:'My Ratings ★3', 4:'My Ratings ★4', 5:'My Ratings ★5'};
+const COMBO_NAMES = {4:'My Albums ★4+', 3:'My Albums ★3+', 5:'My Albums ★5 Shuffle Mix'};
+const PLAYLIST_DESC = 'Managed by My Album Rating Mode — please don\'t rename.';
+const API = 'https://api.spotify.com/v1';
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+let clientId = store.get('clientId', DEFAULT_CLIENT_ID);
+let tokens = store.get('tokens', null);
+let me = null;
+let tracks = [];            // all tracks from saved albums
+let trackByUri = new Map();
+let ratings = new Map();    // uri -> rating (1-5)
+let ratingPlaylists = {};   // rating -> playlist id
+let playlistItems = {1:new Set(),2:new Set(),3:new Set(),4:new Set(),5:new Set()};
+let opts = Object.assign({skipRated:true, autoNext:true, dedupe:true, order:'shuffle'}, store.get('opts', {}));
+let deviceId = store.get('deviceId', null);
+
+// rating mode state
+let rm = { active:false, queue:[], current:null, next:null, pollTimer:null, lastKnownUri:null, foreignCount:0, busy:false };
+let player = null;   // last /me/player response
+let lastRating = null; // {uri, prev, now}
+let libFilter = 'all';
+
+function redirectUri() {
+  let p = location.pathname.replace(/index\.html$/, '');
+  return location.origin + p;
+}
+function toast(msg, ms=2200) { const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'), ms); }
+function fmt(ms) { ms = Math.max(0, ms|0); const s = Math.floor(ms/1000); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function shuffle(a) { for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function norm(s) { return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s*[\(\[].*?(remaster|version|edit|mix|live|mono|stereo|bonus).*?[\)\]]/g,'').replace(/\s*-\s*(\d{4} )?(remaster(ed)?|live|mono|stereo).*$/,'').replace(/[^a-z0-9]+/g,' ').trim(); }
+function songKey(t) { return opts.dedupe ? norm(t.name) + '|' + norm(t.artists) : t.uri; }
+
+/* ---------------- Auth (PKCE) ---------------- */
+async function sha256(s) { return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); }
+function b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function randStr(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, x => 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[x % 62]).join(''); }
+
+async function login() {
+  if (!clientId) { toast('Enter your Spotify Client ID first (Setup / advanced)'); return; }
+  const verifier = randStr(64);
+  const challenge = b64url(await sha256(verifier));
+  sessionStorage.setItem('pkce_verifier', verifier);
+  const p = new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: redirectUri(), scope: SCOPES, code_challenge_method: 'S256', code_challenge: challenge });
+  location.href = 'https://accounts.spotify.com/authorize?' + p.toString();
+}
+async function handleCallback() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('error')) { toast('Spotify login failed: ' + q.get('error')); history.replaceState({}, '', redirectUri()); return; }
+  const code = q.get('code'); if (!code) return;
+  const verifier = sessionStorage.getItem('pkce_verifier');
+  history.replaceState({}, '', redirectUri());
+  const body = new URLSearchParams({ client_id: clientId, grant_type: 'authorization_code', code, redirect_uri: redirectUri(), code_verifier: verifier });
+  const r = await fetch('https://accounts.spotify.com/api/token', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
+  const j = await r.json();
+  if (!j.access_token) { toast('Token error: ' + (j.error_description || j.error)); return; }
+  saveTokens(j);
+}
+function saveTokens(j) {
+  tokens = { access: j.access_token, refresh: j.refresh_token || (tokens && tokens.refresh), exp: Date.now() + (j.expires_in - 60) * 1000 };
+  store.set('tokens', tokens);
+}
+async function ensureToken() {
+  if (!tokens) throw new Error('not logged in');
+  if (Date.now() < tokens.exp) return tokens.access;
+  const body = new URLSearchParams({ client_id: clientId, grant_type: 'refresh_token', refresh_token: tokens.refresh });
+  const r = await fetch('https://accounts.spotify.com/api/token', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
+  const j = await r.json();
+  if (!j.access_token) { logout(); throw new Error('Session expired — please connect again'); }
+  saveTokens(j);
+  return tokens.access;
+}
+function logout() { tokens = null; store.del('tokens'); stopRatingMode(true); showLogin(); }
+
+/* ---------------- API helper ---------------- */
+async function api(method, path, { body, query, raw } = {}) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const token = await ensureToken();
+    let url = path.startsWith('http') ? path : API + path;
+    if (query) url += (url.includes('?') ? '&' : '?') + new URLSearchParams(query).toString();
+    const r = await fetch(url, { method, headers: { Authorization: 'Bearer ' + token, ...(body ? {'Content-Type':'application/json'} : {}) }, body: body ? JSON.stringify(body) : undefined });
+    if (r.status === 429) { const ra = +(r.headers.get('Retry-After') || 2); await sleep((ra + 0.5) * 1000); continue; }
+    if (r.status === 401) { tokens.exp = 0; continue; }
+    if (r.status === 204 || r.status === 202) return null;
+    if (!r.ok) { let msg = ''; try { msg = (await r.json()).error?.message || ''; } catch {} const e = new Error(`${method} ${path} → ${r.status} ${msg}`); e.status = r.status; throw e; }
+    if (raw) return r;
+    const txt = await r.text(); return txt ? JSON.parse(txt) : null;
+  }
+  throw new Error('Spotify API busy, try again');
+}
+async function pageAll(path, query, onPage) {
+  let url = path, q = query, out = [];
+  while (url) {
+    const j = await api('GET', url, { query: q }); q = undefined;
+    const items = j.items || []; out = out.concat(items);
+    if (onPage) onPage(out.length, j.total);
+    url = j.next;
+  }
+  return out;
+}
+
+/* ---------------- Library load ---------------- */
+async function loadLibrary(force = false) {
+  const cached = store.get('libraryCache', null);
+  $('loadingCard').classList.remove('hidden');
+  if (cached && !force && Date.now() - cached.at < 7 * 86400e3) {
+    tracks = cached.tracks; $('loadingText').textContent = 'Reading your ratings…';
+  } else {
+    $('loadingText').textContent = 'Loading albums from your Spotify library…';
+    const albums = await pageAll('/me/albums', { limit: 50 }, (n, total) => { $('loadBar').style.width = (100*n/Math.max(total,1)) + '%'; $('loadingText').textContent = `Loading albums… ${n}/${total}`; });
+    tracks = [];
+    for (const it of albums) {
+      const al = it.album; if (!al) continue;
+      let items = (al.tracks && al.tracks.items) || [];
+      let next = al.tracks && al.tracks.next;
+      while (next) { const j = await api('GET', next); items = items.concat(j.items || []); next = j.next; }
+      const img = (al.images && (al.images[1] || al.images[0]) || {}).url || '';
+      for (const t of items) {
+        if (!t || t.is_local || !t.uri) continue;
+        tracks.push({ uri: t.uri, id: t.id, name: t.name, artists: (t.artists||[]).map(a=>a.name).join(', '), album: al.name, albumId: al.id, albumArtist: (al.artists||[]).map(a=>a.name).join(', '), img, dur: t.duration_ms, disc: t.disc_number, no: t.track_number, added: it.added_at });
+      }
+    }
+    store.set('libraryCache', { at: Date.now(), tracks });
+  }
+  trackByUri = new Map(tracks.map(t => [t.uri, t]));
+  await loadRatings();
+  $('loadingCard').classList.add('hidden');
+  updateStats();
+  renderLibrary();
+  renderPlaylists();
+}
+
+async function loadRatings() {
+  const lists = await pageAll('/me/playlists', { limit: 50 });
+  ratingPlaylists = {};
+  for (const r of [1,2,3,4,5]) {
+    const found = lists.find(p => p && p.name === RATING_NAMES[r] && p.owner && me && p.owner.id === me.id);
+    if (found) ratingPlaylists[r] = found.id;
+  }
+  ratings = new Map();
+  for (const r of [1,2,3,4,5]) {
+    playlistItems[r] = new Set();
+    if (!ratingPlaylists[r]) continue;
+    const items = await pageAll(`/playlists/${ratingPlaylists[r]}/items`, { limit: 50 });
+    for (const it of items) { const tr = it && (it.item || it.track); if (tr && tr.uri) { playlistItems[r].add(tr.uri); ratings.set(tr.uri, r); } }
+  }
+  // propagate ratings across editions when dedupe is on
+  if (opts.dedupe) {
+    const byKey = new Map();
+    for (const t of tracks) { if (ratings.has(t.uri)) byKey.set(songKey(t), ratings.get(t.uri)); }
+    for (const t of tracks) { if (!ratings.has(t.uri) && byKey.has(songKey(t))) ratings.set(t.uri, byKey.get(songKey(t))); }
+  }
+  window._comboLists = lists;
+}
+async function ensureRatingPlaylist(r) {
+  if (ratingPlaylists[r]) return ratingPlaylists[r];
+  const j = await api('POST', '/me/playlists', { body: { name: RATING_NAMES[r], public: false, description: PLAYLIST_DESC } });
+  ratingPlaylists[r] = j.id; return j.id;
+}
+
+function isRated(t) { return ratings.has(t.uri); }
+function updateStats() {
+  const total = tracks.length, rated = tracks.filter(isRated).length;
+  $('stTotal').textContent = total; $('stRated').textContent = rated; $('stLeft').textContent = total - rated;
+  $('ratedBar').style.width = (total ? 100*rated/total : 0) + '%';
+  $('hdrSub').textContent = me ? `${me.display_name || me.id} · ${rated}/${total} rated` : '';
+}
+
+/* ---------------- Rating ---------------- */
+async function setRating(uri, r) {
+  const t = trackByUri.get(uri) || { uri, name: '', artists: '' };
+  const prev = ratings.get(uri) || null;
+  // Which URIs to write: the track itself plus, if dedupe, sibling editions that are in playlists
+  const pid = await ensureRatingPlaylist(r);
+  // remove from other rating playlists
+  for (const k of [1,2,3,4,5]) {
+    if (k === r || !ratingPlaylists[k]) continue;
+    const toRemove = [...playlistItems[k]].filter(u => u === uri || (opts.dedupe && trackByUri.has(u) && songKey(trackByUri.get(u)) === songKey(t)));
+    if (toRemove.length) { await api('DELETE', `/playlists/${ratingPlaylists[k]}/items`, { body: { items: toRemove.map(u => ({ uri: u })) } }); toRemove.forEach(u => playlistItems[k].delete(u)); }
+  }
+  if (!playlistItems[r].has(uri)) { await api('POST', `/playlists/${pid}/items`, { body: { uris: [uri] } }); playlistItems[r].add(uri); }
+  ratings.set(uri, r);
+  if (opts.dedupe) for (const x of tracks) if (songKey(x) === songKey(t)) ratings.set(x.uri, r);
+  lastRating = { uri, prev, now: r };
+  $('btnUndo').disabled = false;
+  updateStats();
+}
+async function clearRating(uri) {
+  const t = trackByUri.get(uri);
+  for (const k of [1,2,3,4,5]) {
+    if (!ratingPlaylists[k]) continue;
+    const toRemove = [...playlistItems[k]].filter(u => u === uri || (opts.dedupe && t && trackByUri.has(u) && songKey(trackByUri.get(u)) === songKey(t)));
+    if (toRemove.length) { await api('DELETE', `/playlists/${ratingPlaylists[k]}/items`, { body: { items: toRemove.map(u => ({ uri: u })) } }); toRemove.forEach(u => playlistItems[k].delete(u)); }
+  }
+  ratings.delete(uri);
+  if (opts.dedupe && t) for (const x of tracks) if (songKey(x) === songKey(t)) ratings.delete(x.uri);
+  updateStats();
+}
+
+async function rateCurrent(r) {
+  const cur = rm.active ? rm.current : (player && player.item ? trackByUri.get(player.item.uri) || { uri: player.item.uri, name: player.item.name, artists: (player.item.artists||[]).map(a=>a.name).join(', ') } : null);
+  if (!cur) { toast('Nothing is playing'); return; }
+  if (rm.busy) return; rm.busy = true;
+  try {
+    await setRating(cur.uri, r);
+    toast(`★${r} — ${cur.name}`);
+    highlightRating(r);
+    if (rm.active && opts.autoNext) await advance(true);
+  } catch (e) { toast('Could not save rating: ' + e.message, 4000); }
+  finally { rm.busy = false; renderNowPlaying(); }
+}
+async function undoLast() {
+  if (!lastRating) return;
+  try {
+    if (lastRating.prev) await setRating(lastRating.uri, lastRating.prev); else await clearRating(lastRating.uri);
+    toast('Rating undone'); lastRating = null; $('btnUndo').disabled = true; renderNowPlaying();
+  } catch (e) { toast('Undo failed: ' + e.message); }
+}
+function highlightRating(r) { document.querySelectorAll('#rateBar button').forEach((b,i) => b.classList.toggle('sel', i+1 === r)); }
+
+/* ---------------- Devices & playback ---------------- */
+async function loadDevices(showToast) {
+  try {
+    const j = await api('GET', '/me/player/devices');
+    const sel = $('deviceSel'); sel.innerHTML = '';
+    const devs = (j && j.devices) || [];
+    if (!devs.length) { sel.innerHTML = '<option value="">No Spotify device found — open Spotify somewhere</option>'; if (showToast) toast('No active Spotify device. Open Spotify on your phone or computer.'); return; }
+    for (const d of devs) { const o = document.createElement('option'); o.value = d.id; o.textContent = `${d.name} (${d.type})${d.is_active ? ' · active' : ''}`; sel.appendChild(o); }
+    const active = devs.find(d => d.is_active);
+    if (deviceId && devs.some(d => d.id === deviceId)) sel.value = deviceId; else if (active) sel.value = active.id;
+    deviceId = sel.value; store.set('deviceId', deviceId);
+    sel.onchange = () => { deviceId = sel.value; store.set('deviceId', deviceId); };
+  } catch (e) { toast('Devices: ' + e.message); }
+}
+function setOrder(o) { opts.order = o; saveOpts(); $('ordShuffle').classList.toggle('on', o==='shuffle'); $('ordAlbum').classList.toggle('on', o==='album'); }
+
+function buildQueue() {
+  let pool = tracks.filter(t => !(opts.skipRated && isRated(t)));
+  if (opts.dedupe) { const seen = new Set(); pool = pool.filter(t => { const k = songKey(t); if (seen.has(k)) return false; seen.add(k); return true; }); }
+  if (opts.order === 'shuffle') return shuffle(pool);
+  const albumIds = shuffle([...new Set(pool.map(t => t.albumId))]);
+  const rank = new Map(albumIds.map((a,i)=>[a,i]));
+  return pool.sort((a,b) => rank.get(a.albumId)-rank.get(b.albumId) || a.disc-b.disc || a.no-b.no);
+}
+
+async function startRatingMode() {
+  if (!tracks.length) { toast('Library still loading'); return; }
+  await loadDevices(false);
+  if (!deviceId) { toast('Open Spotify on a device first, then refresh devices.', 3500); return; }
+  rm.queue = buildQueue();
+  if (!rm.queue.length) { toast('Everything is rated — nothing left! 🎉'); return; }
+  rm.active = true; rm.foreignCount = 0; rm.current = null; rm.next = null;
+  $('btnStop').classList.remove('hidden'); $('startCard').classList.add('hidden'); $('modePill').textContent = 'Rating mode'; $('modePill').classList.add('on'); $('npHeading').textContent = 'Rate this song';
+  try {
+    await playNextFromQueue(true);
+  } catch (e) { toast('Could not start playback: ' + e.message, 5000); stopRatingMode(); }
+}
+function stopRatingMode(silent) {
+  rm.active = false; rm.current = null; rm.next = null; rm.queue = [];
+  $('btnStop').classList.add('hidden'); $('startCard').classList.remove('hidden'); $('modePill').textContent = 'Idle'; $('modePill').classList.remove('on'); $('npHeading').textContent = 'Now playing';
+  if (!silent) toast('Rating mode stopped');
+  renderNowPlaying();
+}
+// Start playing the next track explicitly and queue the one after it.
+async function playNextFromQueue(first) {
+  rm.current = rm.queue.shift() || null;
+  if (!rm.current) { toast('All done — every song is rated! 🎉', 5000); stopRatingMode(true); return; }
+  await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined, body: { uris: [rm.current.uri] } });
+  await queueFollowing();
+  highlightRating(0);
+  renderNowPlaying();
+}
+async function queueFollowing() {
+  rm.next = rm.queue[0] || null;
+  if (rm.next) { try { await api('POST', '/me/player/queue', { query: { uri: rm.next.uri, ...(deviceId ? { device_id: deviceId } : {}) } }); } catch (e) { /* queue may fail momentarily; the poller will recover */ } }
+}
+// Move to the next track. If we have a queued "next", skipping is seamless; otherwise play explicitly.
+async function advance(userInitiated) {
+  if (!rm.active) return;
+  if (rm.next) {
+    rm.current = rm.queue.shift(); rm.next = null;
+    try { await api('POST', '/me/player/next', { query: deviceId ? { device_id: deviceId } : undefined }); } catch (e) { await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined, body: { uris: [rm.current.uri] } }); }
+    await sleep(400);
+    await queueFollowing();
+    highlightRating(0);
+    renderNowPlaying();
+  } else {
+    await playNextFromQueue();
+  }
+}
+async function skipNoRate() {
+  if (!rm.active) { try { await api('POST', '/me/player/next'); } catch (e) { toast(e.message); } return; }
+  if (rm.busy) return; rm.busy = true;
+  try { if (rm.current) rm.queue.push(rm.current); await advance(true); toast('Skipped — will come back later'); }
+  catch (e) { toast('Skip failed: ' + e.message); } finally { rm.busy = false; }
+}
+async function togglePlay() {
+  try {
+    if (player && player.is_playing) await api('PUT', '/me/player/pause'); else await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined });
+  } catch (e) { toast(e.message); }
+}
+async function seekBack() { try { const pos = Math.max(0, ((player && player.progress_ms) || 0) - 15000); await api('PUT', '/me/player/seek', { query: { position_ms: pos } }); } catch (e) { toast(e.message); } }
+
+/* ---------------- Poller: keeps UI in sync & handles auto-advance ---------------- */
+async function poll() {
+  if (!tokens) return;
+  try {
+    const p = await api('GET', '/me/player', { query: { additional_types: 'track' } });
+    player = p;
+    if (rm.active && p && p.item) {
+      const uri = p.item.uri;
+      if (rm.current && uri === rm.current.uri) {
+        rm.foreignCount = 0;
+      } else if (rm.next && uri === rm.next.uri) {
+        // Spotify moved on by itself (song ended without a rating) — keep it for later
+        if (rm.current) rm.queue.push(rm.current);
+        rm.current = rm.queue.shift(); rm.next = null;
+        await queueFollowing();
+        highlightRating(0);
+      } else if (rm.current) {
+        // Something else is playing (autoplay, or the user picked another song)
+        rm.foreignCount++;
+        if (rm.foreignCount === 2) { try { await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined, body: { uris: [rm.current.uri] } }); await queueFollowing(); } catch {} }
+        if (rm.foreignCount >= 6) { toast('Looks like you took over playback — rating mode paused.', 4000); stopRatingMode(true); }
+      }
+    } else if (rm.active && p && !p.is_playing && p.progress_ms === 0 && !p.item) {
+      // playback fully stopped
+    }
+    renderNowPlaying();
+  } catch (e) { /* network hiccup: ignore */ }
+}
+function renderNowPlaying() {
+  const p = player;
+  const t = rm.active && rm.current ? rm.current : (p && p.item ? (trackByUri.get(p.item.uri) || { uri: p.item.uri, name: p.item.name, artists: (p.item.artists||[]).map(a=>a.name).join(', '), album: p.item.album && p.item.album.name, img: p.item.album && p.item.album.images && p.item.album.images[0] && p.item.album.images[0].url, dur: p.item.duration_ms }) : null);
+  if (!t) { $('npTitle').textContent = 'Nothing playing'; $('npArtist').textContent = ''; $('npAlbum').textContent = ''; $('npArt').removeAttribute('src'); $('npBar').style.width = '0%'; $('npStatus').textContent = tokens ? 'Start rating mode, or play something in Spotify and rate it here.' : ''; return; }
+  $('npTitle').textContent = t.name; $('npArtist').textContent = t.artists; $('npAlbum').textContent = t.album || '';
+  if (t.img && $('npArt').getAttribute('src') !== t.img) $('npArt').src = t.img;
+  const playingThis = p && p.item && p.item.uri === t.uri;
+  const prog = playingThis ? p.progress_ms : 0, dur = t.dur || (p && p.item && p.item.duration_ms) || 0;
+  $('npBar').style.width = (dur ? 100*prog/dur : 0) + '%'; $('npCur').textContent = fmt(prog); $('npDur').textContent = fmt(dur);
+  $('btnPlay').textContent = p && p.is_playing ? '⏸' : '▶';
+  const r = ratings.get(t.uri);
+  const inLib = trackByUri.has(t.uri);
+  $('npStatus').textContent = (r ? `Already rated ★${r}. ` : '') + (inLib ? '' : 'Not from your saved albums — rating still works. ') + (p && p.device ? `Playing on ${p.device.name}` : '');
+  highlightRating(r || 0);
+  $('queueInfo').textContent = rm.active ? `${rm.queue.length} songs left in this session` : '';
+}
+
+/* ---------------- Playlists view ---------------- */
+function renderPlaylists() {
+  const el = $('ratingPlaylists'); el.innerHTML = '';
+  for (const r of [5,4,3,2,1]) {
+    const n = tracks.filter(t => ratings.get(t.uri) === r).length;
+    const div = document.createElement('div'); div.className = 'item';
+    const link = ratingPlaylists[r] ? `https://open.spotify.com/playlist/${ratingPlaylists[r]}` : null;
+    div.innerHTML = `<span class="badge r${r}">★${r}</span><div class="info"><div class="t">${RATING_NAMES[r]}</div><div class="a">${n} song${n===1?'':'s'}${link ? '' : ' · created when you first rate a song ' + r}</div></div>` + (link ? `<a href="${link}" target="_blank" rel="noopener"><button class="small">Open</button></a>` : '');
+    el.appendChild(div);
+  }
+}
+async function buildCombo(min, onlyExact) {
+  const name = COMBO_NAMES[min];
+  $('comboStatus').innerHTML = '<span class="spinner"></span>Syncing ' + name + '…';
+  try {
+    let lists = window._comboLists || await pageAll('/me/playlists', { limit: 50 });
+    let pl = lists.find(p => p && p.name === name && p.owner && p.owner.id === me.id);
+    if (!pl) { pl = await api('POST', '/me/playlists', { body: { name, public: false, description: PLAYLIST_DESC } }); window._comboLists = null; }
+    const seen = new Set();
+    let uris = tracks.filter(t => { const r = ratings.get(t.uri); return onlyExact ? r === min : (r && r >= min); }).filter(t => { const k = songKey(t); if (seen.has(k)) return false; seen.add(k); return true; }).map(t => t.uri);
+    if (onlyExact) shuffle(uris); else uris.sort((a,b) => (ratings.get(b)||0) - (ratings.get(a)||0));
+    await api('PUT', `/playlists/${pl.id}/items`, { body: { uris: uris.slice(0, 100) } });
+    for (let i = 100; i < uris.length; i += 100) await api('POST', `/playlists/${pl.id}/items`, { body: { uris: uris.slice(i, i+100) } });
+    $('comboStatus').innerHTML = `✅ ${name}: ${uris.length} songs · <a href="https://open.spotify.com/playlist/${pl.id}" target="_blank" rel="noopener">open in Spotify</a>`;
+  } catch (e) { $('comboStatus').textContent = 'Failed: ' + e.message; }
+}
+
+/* ---------------- Library view ---------------- */
+function setFilter(f, btn) { libFilter = f; document.querySelectorAll('.filterbar button').forEach(b => b.classList.toggle('on', b === btn)); renderLibrary(); }
+let libLimit = 150;
+function renderLibrary() {
+  const q = norm($('searchBox').value);
+  let list = tracks.filter(t => { const r = ratings.get(t.uri); if (libFilter === 'all') return !!r; if (libFilter === 'unrated') return !r; return r === libFilter; });
+  if (opts.dedupe) { const seen = new Set(); list = list.filter(t => { const k = songKey(t); if (seen.has(k)) return false; seen.add(k); return true; }); }
+  if (q) list = list.filter(t => norm(t.name + ' ' + t.artists + ' ' + t.album).includes(q));
+  const el = $('libList'); el.innerHTML = '';
+  for (const t of list.slice(0, libLimit)) {
+    const r = ratings.get(t.uri) || 0;
+    const div = document.createElement('div'); div.className = 'item';
+    div.innerHTML = `<img src="${t.img}" loading="lazy" alt=""><div class="info"><div class="t">${esc(t.name)}</div><div class="a">${esc(t.artists)} · ${esc(t.album)}</div></div><div class="mini-rate">${[1,2,3,4,5].map(k => `<button class="${k===r?'on':''}" data-uri="${t.uri}" data-r="${k}">${k}</button>`).join('')}</div>`;
+    el.appendChild(div);
+  }
+  el.onclick = async (ev) => { const b = ev.target.closest('button[data-uri]'); if (!b) return; const uri = b.dataset.uri, r = +b.dataset.r; try { if (ratings.get(uri) === r) await clearRating(uri); else await setRating(uri, r); renderLibrary(); renderPlaylists(); } catch (e) { toast(e.message); } };
+  $('libMore').innerHTML = list.length > libLimit ? `Showing ${libLimit} of ${list.length} · <a href="#" onclick="libLimit+=200;renderLibrary();return false;">show more</a>` : `${list.length} song${list.length===1?'':'s'}`;
+}
+function esc(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------------- Misc UI ---------------- */
+function showView(v) {
+  for (const x of ['Rate','Playlists','Library','Settings']) $('view'+x).classList.toggle('hidden', x !== v);
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+  if (v === 'Library') renderLibrary(); if (v === 'Playlists') renderPlaylists();
+}
+function showLogin() { $('viewLogin').classList.remove('hidden'); $('tabs').classList.add('hidden'); for (const x of ['Rate','Playlists','Library','Settings']) $('view'+x).classList.add('hidden'); $('hdrSub').textContent = 'Not connected'; }
+function saveClientId(fromSettings) { const v = (fromSettings ? $('clientIdInput2') : $('clientIdInput')).value.trim(); if (v) { clientId = v; store.set('clientId', v); toast('Saved'); } }
+function saveOpts() { opts.skipRated = $('optSkipRated').checked; opts.autoNext = $('optAutoNext').checked; const d = $('optDedupe').checked; const changed = d !== opts.dedupe; opts.dedupe = d; store.set('opts', opts); if (changed) { loadRatings().then(() => { updateStats(); renderLibrary(); }); } }
+async function refreshLibrary() { showView('Rate'); try { await loadLibrary(true); toast('Library reloaded'); } catch (e) { toast(e.message, 4000); } }
+
+async function boot() {
+  $('redirectUriShow').textContent = redirectUri(); $('redirectUriShow2').textContent = redirectUri();
+  $('clientIdInput').value = clientId; $('clientIdInput2').value = clientId;
+  $('optSkipRated').checked = opts.skipRated; $('optAutoNext').checked = opts.autoNext; $('optDedupe').checked = opts.dedupe;
+  setOrder(opts.order);
+  await handleCallback();
+  if (!tokens) { showLogin(); return; }
+  $('viewLogin').classList.add('hidden'); $('tabs').classList.remove('hidden'); showView('Rate');
+  try {
+    me = await api('GET', '/me');
+    $('acctInfo').textContent = `Connected as ${me.display_name || me.id}`;
+    await loadLibrary(false);
+    loadDevices(false);
+    setInterval(poll, 2000); poll();
+  } catch (e) { toast(e.message, 5000); if (/not logged in|expired/.test(e.message)) showLogin(); }
+}
+boot();
+</script>
+</body>
+</html>
