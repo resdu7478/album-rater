@@ -2,9 +2,9 @@
    Bump CACHE_VERSION on every deploy (keep it in step with APP_VERSION in
    index.html) so a new worker installs, the old cache is purged, and the app
    surfaces the "Update available — reload" prompt. */
-const CACHE_VERSION = 'v1.2';
+const CACHE_VERSION = 'v1.3';
 const CACHE = 'album-rater-' + CACHE_VERSION;
-const ASSETS = ['./', './index.html'];
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   // Don't skipWaiting automatically — the page prompts the user, then tells us.

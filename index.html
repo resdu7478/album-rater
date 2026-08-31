@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#121212">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Album Rater">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>My Album Rating Mode</title>
 <style>
   :root {
@@ -185,7 +190,8 @@
       <div class="controls">
         <button onclick="togglePlay()" id="btnPlay">⏯</button>
         <button onclick="seekBack()" title="Back 15s">↺ 15s</button>
-        <button onclick="skipNoRate()" id="btnSkip">Skip, rate later ⏭</button>
+        <button onclick="seekFwd()" title="Forward 15s">15s ↻</button>
+        <button onclick="skipNoRate()" id="btnSkip" title="Skip, rate later">Skip ⏭</button>
       </div>
       <div class="row" style="margin-top:10px; justify-content:space-between">
         <button class="small" onclick="undoLast()" id="btnUndo" disabled>↩ Undo last rating</button>
@@ -287,10 +293,16 @@
    Bump this on every user-facing change and add a matching CHANGELOG entry
    below AND in CHANGELOG.md. When bumping, also bump the version in sw.js so
    the service worker deploys a fresh cache. */
-const APP_VERSION = '1.2';
+const APP_VERSION = '1.3';
 // Newest first. The "What's New" modal reads from this data — never hardcode
 // release notes in the modal itself. Mirror of CHANGELOG.md.
 const CHANGELOG = [
+  { version: '1.3', date: '2026-08-30', changes: {
+    Added: [
+      "Jump forward 15 seconds in the current song (next to the existing back-15s button).",
+      "The app now has its own icon, so it looks right when you add it to your home screen or see it in a browser tab.",
+    ],
+  }},
   { version: '1.2', date: '2026-08-30', changes: {
     Added: [
       "“What's New” popup on launch that lists everything new since you last opened the app.",
@@ -627,6 +639,14 @@ async function togglePlay() {
   } catch (e) { toast(e.message); }
 }
 async function seekBack() { try { const pos = Math.max(0, ((player && player.progress_ms) || 0) - 15000); await api('PUT', '/me/player/seek', { query: { position_ms: pos } }); } catch (e) { toast(e.message); } }
+async function seekFwd() {
+  try {
+    const dur = (player && player.item && player.item.duration_ms) || 0;
+    let pos = ((player && player.progress_ms) || 0) + 15000;
+    if (dur) pos = Math.min(pos, Math.max(0, dur - 1000)); // don't run past the end
+    await api('PUT', '/me/player/seek', { query: { position_ms: Math.max(0, pos) } });
+  } catch (e) { toast(e.message); }
+}
 
 /* ---------------- Poller: keeps UI in sync & handles auto-advance ---------------- */
 async function poll() {

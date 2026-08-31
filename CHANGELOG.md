@@ -9,6 +9,14 @@ The version in `index.html` (`APP_VERSION`) is the single source of truth and is
 mirrored by the `CHANGELOG` array in that file (which drives the in-app
 "What's New" popup) and by `CACHE_VERSION` in `sw.js`.
 
+## [1.3] - 2026-08-30
+
+### Added
+- "Forward 15s" playback control alongside the existing "back 15s" button
+  (clamps to the end of the track).
+- App icon (dark tile with a green ★) plus a web manifest, so the app shows a
+  proper icon in browser tabs and when added to a phone home screen.
+
 ## [1.2] - 2026-08-30
 
 ### Added
