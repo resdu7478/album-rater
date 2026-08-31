@@ -87,6 +87,19 @@
   .mini-rate { display: flex; gap: 4px; }
   .mini-rate button { padding: 6px 0; width: 30px; font-size: 13px; font-weight: 700; border-radius: 8px; }
   .mini-rate button.on { background: var(--green); color: #000; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50; display: flex; align-items: flex-end; justify-content: center; opacity: 0; transition: opacity .18s; }
+  .modal-backdrop.show { opacity: 1; }
+  .modal { background: var(--panel); border-radius: 20px 20px 0 0; width: 100%; max-width: 640px; max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,.5); transform: translateY(12px); transition: transform .18s; }
+  .modal-backdrop.show .modal { transform: none; }
+  .modal h2 { color: var(--text); font-size: 20px; text-transform: none; letter-spacing: 0; margin: 0 0 2px; }
+  .modal .rel { margin-top: 16px; }
+  .modal .rel h3 { font-size: 14px; margin: 0 0 6px; color: var(--green); }
+  .modal .grp { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin: 8px 0 4px; }
+  .modal ul { margin: 0 0 4px; padding-left: 20px; }
+  .modal li { margin: 4px 0; font-size: 14px; line-height: 1.4; }
+  .update-bar { position: fixed; left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); background: var(--green); color: #000; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; z-index: 40; box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+  .update-bar span { font-weight: 600; font-size: 14px; }
+  .update-bar button { background: #000; color: #fff; padding: 10px 14px; font-weight: 700; min-height: 44px; }
 </style>
 </head>
 <body>
@@ -246,7 +259,10 @@
     </div>
     <div class="card small muted">
       <b>How it works.</b> Songs come from albums saved in <i>Your Library → Albums</i>. Ratings are stored as five private playlists named “My Ratings ★1” … “My Ratings ★5”. A song is “rated” if it's in any of them — so you can even rate from the Spotify app by dragging a song into one of those playlists. Playback uses Spotify Connect, so music plays on whatever device you pick and this page is just the remote.
-      <div style="margin-top:8px">Version 1.1 — rating mode follows whichever Spotify device is currently active, so you can move playback between your phone, PC and speakers mid-session.</div>
+      <div class="row" style="margin-top:10px; justify-content:space-between; align-items:center">
+        <span>Version <b id="appVersion">–</b></span>
+        <button class="small" onclick="showWhatsNew()">What's new</button>
+      </div>
     </div>
   </section>
 
@@ -266,6 +282,32 @@
    My Album Rating Mode — single-file Spotify Connect rater
    Uses the Spotify Web API as of the February 2026 migration.
    ========================================================= */
+
+/* Single source of truth for the app version (semantic versioning).
+   Bump this on every user-facing change and add a matching CHANGELOG entry
+   below AND in CHANGELOG.md. When bumping, also bump the version in sw.js so
+   the service worker deploys a fresh cache. */
+const APP_VERSION = '1.2';
+// Newest first. The "What's New" modal reads from this data — never hardcode
+// release notes in the modal itself. Mirror of CHANGELOG.md.
+const CHANGELOG = [
+  { version: '1.2', date: '2026-08-30', changes: {
+    Added: [
+      "“What's New” popup on launch that lists everything new since you last opened the app.",
+      "Automatic update detection — when a new version is deployed you'll get a non-blocking “Update available — reload” prompt (also re-checks when you return to the app).",
+    ],
+  }},
+  { version: '1.1', date: '2026-08-30', changes: {
+    Changed: [
+      "Rating mode now follows whichever Spotify device is currently active, so you can move playback between your phone, PC and speakers mid-session.",
+    ],
+  }},
+  { version: '1.0', date: '2026-08-30', changes: {
+    Added: [
+      "Initial release — rate every song in your saved albums 1–5; ratings are stored as five Spotify playlists so they sync everywhere.",
+    ],
+  }},
+];
 
 const DEFAULT_CLIENT_ID = '4866fd618022439bb34b3393fece1af5';
 const SCOPES = 'user-library-read user-read-playback-state user-modify-playback-state playlist-read-private playlist-modify-private playlist-modify-public';
@@ -689,11 +731,94 @@ function saveClientId(fromSettings) { const v = (fromSettings ? $('clientIdInput
 function saveOpts() { opts.skipRated = $('optSkipRated').checked; opts.autoNext = $('optAutoNext').checked; const d = $('optDedupe').checked; const changed = d !== opts.dedupe; opts.dedupe = d; store.set('opts', opts); if (changed) { loadRatings().then(() => { updateStats(); renderLibrary(); }); } }
 async function refreshLibrary() { showView('Rate'); try { await loadLibrary(true); toast('Library reloaded'); } catch (e) { toast(e.message, 4000); } }
 
+/* ---------------- Versioning & "What's New" ---------------- */
+// Compare two semver-ish strings ("1.2.0"). Returns -1, 0 or 1.
+function cmpVer(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+// Build and show the modal. With no argument, shows the full changelog
+// (used by the "What's new" button); otherwise shows only the given releases.
+function showWhatsNew(releases) {
+  const rels = releases && releases.length ? releases : CHANGELOG;
+  if (!rels.length) return;
+  const back = document.createElement('div');
+  back.className = 'modal-backdrop';
+  const rel = rels.map(r => {
+    const groups = Object.entries(r.changes).map(([grp, items]) =>
+      `<div class="grp">${esc(grp)}</div><ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`
+    ).join('');
+    return `<div class="rel"><h3>Version ${esc(r.version)}${r.date ? ' · ' + esc(r.date) : ''}</h3>${groups}</div>`;
+  }).join('');
+  back.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="What's new">
+    <h2>What's new</h2>
+    <div class="muted small">You're on version ${esc(APP_VERSION)}.</div>
+    ${rel}
+    <button class="primary" style="width:100%; margin-top:18px; padding:14px;">Got it</button>
+  </div>`;
+  const close = () => { back.classList.remove('show'); setTimeout(() => back.remove(), 200); };
+  back.addEventListener('click', e => { if (e.target === back) close(); });
+  back.querySelector('button.primary').addEventListener('click', close);
+  document.body.appendChild(back);
+  requestAnimationFrame(() => back.classList.add('show'));
+}
+// On launch: show the popup only if the stored version is older than the current
+// one. First-ever launch just records the version without a popup.
+function checkWhatsNew() {
+  const el = $('appVersion'); if (el) el.textContent = APP_VERSION;
+  const last = store.get('lastSeenVersion', null);
+  if (last === null) { store.set('lastSeenVersion', APP_VERSION); return; }
+  if (cmpVer(last, APP_VERSION) < 0) {
+    const newer = CHANGELOG.filter(r => cmpVer(r.version, last) > 0 && cmpVer(r.version, APP_VERSION) <= 0);
+    showWhatsNew(newer);
+  }
+  store.set('lastSeenVersion', APP_VERSION);
+}
+
+/* ---------------- Self-updating (service worker) ---------------- */
+function showUpdatePrompt(reg) {
+  if (document.getElementById('updateBar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'updateBar'; bar.className = 'update-bar';
+  bar.innerHTML = `<span>Update available</span><button>Reload</button>`;
+  bar.querySelector('button').addEventListener('click', () => {
+    if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING'); else location.reload();
+  });
+  document.body.appendChild(bar);
+}
+function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return; reloading = true; location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdatePrompt(reg);
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing; if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdatePrompt(reg);
+      });
+    });
+    // iOS home-screen PWAs resume from memory — re-check on foreground so a stale
+    // install can't get stuck on an old version indefinitely.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch(() => { /* offline / no SW support: keep running on current version */ });
+}
+
 async function boot() {
   $('redirectUriShow').textContent = redirectUri(); $('redirectUriShow2').textContent = redirectUri();
   $('clientIdInput').value = clientId; $('clientIdInput2').value = clientId;
   $('optSkipRated').checked = opts.skipRated; $('optAutoNext').checked = opts.autoNext; $('optDedupe').checked = opts.dedupe;
   setOrder(opts.order);
+  checkWhatsNew();
+  registerSW();
   await handleCallback();
   if (!tokens) { showLogin(); return; }
   $('viewLogin').classList.add('hidden'); $('tabs').classList.remove('hidden'); showView('Rate');
