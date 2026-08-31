@@ -145,7 +145,7 @@
         <select id="deviceSel" class="grow"></select>
         <button onclick="loadDevices(true)" title="Refresh devices">↻</button>
       </div>
-      <p class="small muted" id="deviceHint">Open Spotify on the device you want to hear (phone, computer, speaker), then pick it here.</p>
+      <p class="small muted" id="deviceHint">Open Spotify on the device you want to hear (phone, the desktop app, a speaker), tap ↻, then pick it here. If you later switch devices inside Spotify, rating mode follows you.</p>
       <button class="primary" style="width:100%; padding:16px; font-size:16px;" id="btnStart" onclick="startRatingMode()">▶ Start rating mode</button>
     </div>
 
@@ -246,7 +246,7 @@
     </div>
     <div class="card small muted">
       <b>How it works.</b> Songs come from albums saved in <i>Your Library → Albums</i>. Ratings are stored as five private playlists named “My Ratings ★1” … “My Ratings ★5”. A song is “rated” if it's in any of them — so you can even rate from the Spotify app by dragging a song into one of those playlists. Playback uses Spotify Connect, so music plays on whatever device you pick and this page is just the remote.
-      <div style="margin-top:8px">Version 1.0</div>
+      <div style="margin-top:8px">Version 1.1 — rating mode follows whichever Spotify device is currently active, so you can move playback between your phone, PC and speakers mid-session.</div>
     </div>
   </section>
 
@@ -539,25 +539,32 @@ function stopRatingMode(silent) {
   if (!silent) toast('Rating mode stopped');
   renderNowPlaying();
 }
+// The device we send commands to: whatever Spotify says is active right now (so if you move
+// playback to another speaker/phone mid-session, the rater follows you), falling back to the
+// device chosen at start. Only the very first "play" pins the chosen device.
+function targetDevice() { return (player && player.device && player.device.id) || deviceId || null; }
+function devQ(extra) { const d = targetDevice(); return Object.assign({}, extra || {}, d ? { device_id: d } : {}); }
+
 // Start playing the next track explicitly and queue the one after it.
 async function playNextFromQueue(first) {
   rm.current = rm.queue.shift() || null;
   if (!rm.current) { toast('All done — every song is rated! 🎉', 5000); stopRatingMode(true); return; }
-  await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined, body: { uris: [rm.current.uri] } });
+  const dev = first ? (deviceId || targetDevice()) : targetDevice();
+  await api('PUT', '/me/player/play', { query: dev ? { device_id: dev } : undefined, body: { uris: [rm.current.uri] } });
   await queueFollowing();
   highlightRating(0);
   renderNowPlaying();
 }
 async function queueFollowing() {
   rm.next = rm.queue[0] || null;
-  if (rm.next) { try { await api('POST', '/me/player/queue', { query: { uri: rm.next.uri, ...(deviceId ? { device_id: deviceId } : {}) } }); } catch (e) { /* queue may fail momentarily; the poller will recover */ } }
+  if (rm.next) { try { await api('POST', '/me/player/queue', { query: devQ({ uri: rm.next.uri }) }); } catch (e) { /* queue may fail momentarily; the poller will recover */ } }
 }
 // Move to the next track. If we have a queued "next", skipping is seamless; otherwise play explicitly.
 async function advance(userInitiated) {
   if (!rm.active) return;
   if (rm.next) {
     rm.current = rm.queue.shift(); rm.next = null;
-    try { await api('POST', '/me/player/next', { query: deviceId ? { device_id: deviceId } : undefined }); } catch (e) { await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined, body: { uris: [rm.current.uri] } }); }
+    try { await api('POST', '/me/player/next', { query: devQ() }); } catch (e) { await api('PUT', '/me/player/play', { query: devQ(), body: { uris: [rm.current.uri] } }); }
     await sleep(400);
     await queueFollowing();
     highlightRating(0);
@@ -574,7 +581,7 @@ async function skipNoRate() {
 }
 async function togglePlay() {
   try {
-    if (player && player.is_playing) await api('PUT', '/me/player/pause'); else await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined });
+    if (player && player.is_playing) await api('PUT', '/me/player/pause'); else await api('PUT', '/me/player/play', { query: devQ() });
   } catch (e) { toast(e.message); }
 }
 async function seekBack() { try { const pos = Math.max(0, ((player && player.progress_ms) || 0) - 15000); await api('PUT', '/me/player/seek', { query: { position_ms: pos } }); } catch (e) { toast(e.message); } }
@@ -598,7 +605,7 @@ async function poll() {
       } else if (rm.current) {
         // Something else is playing (autoplay, or the user picked another song)
         rm.foreignCount++;
-        if (rm.foreignCount === 2) { try { await api('PUT', '/me/player/play', { query: deviceId ? { device_id: deviceId } : undefined, body: { uris: [rm.current.uri] } }); await queueFollowing(); } catch {} }
+        if (rm.foreignCount === 2) { try { await api('PUT', '/me/player/play', { query: devQ(), body: { uris: [rm.current.uri] } }); await queueFollowing(); } catch {} }
         if (rm.foreignCount >= 6) { toast('Looks like you took over playback — rating mode paused.', 4000); stopRatingMode(true); }
       }
     } else if (rm.active && p && !p.is_playing && p.progress_ms === 0 && !p.item) {
