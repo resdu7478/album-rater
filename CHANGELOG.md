@@ -9,6 +9,13 @@ The version in `index.html` (`APP_VERSION`) is the single source of truth and is
 mirrored by the `CHANGELOG` array in that file (which drives the in-app
 "What's New" popup) and by `CACHE_VERSION` in `sw.js`.
 
+## [1.4] - 2026-08-30
+
+### Added
+- Playlists whose name starts with 💿 now count as albums, so you can rate CDs
+  that aren't on Spotify by recreating them song by song. Name a playlist
+  "💿 Something" and reload albums to pick it up.
+
 ## [1.3] - 2026-08-30
 
 ### Added

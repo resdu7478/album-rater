@@ -264,7 +264,7 @@
       <button onclick="saveClientId(true)">Save</button>
     </div>
     <div class="card small muted">
-      <b>How it works.</b> Songs come from albums saved in <i>Your Library → Albums</i>. Ratings are stored as five private playlists named “My Ratings ★1” … “My Ratings ★5”. A song is “rated” if it's in any of them — so you can even rate from the Spotify app by dragging a song into one of those playlists. Playback uses Spotify Connect, so music plays on whatever device you pick and this page is just the remote.
+      <b>How it works.</b> Songs come from albums saved in <i>Your Library → Albums</i>, plus any playlist whose name starts with 💿 (CDs recreated song by song because the original isn't on Spotify — you can make your own: name a playlist “💿 Something” and reload albums). Ratings are stored as five private playlists named “My Ratings ★1” … “My Ratings ★5”. A song is “rated” if it's in any of them — so you can even rate from the Spotify app by dragging a song into one of those playlists. Playback uses Spotify Connect, so music plays on whatever device you pick and this page is just the remote.
       <div class="row" style="margin-top:10px; justify-content:space-between; align-items:center">
         <span>Version <b id="appVersion">–</b></span>
         <button class="small" onclick="showWhatsNew()">What's new</button>
@@ -293,10 +293,15 @@
    Bump this on every user-facing change and add a matching CHANGELOG entry
    below AND in CHANGELOG.md. When bumping, also bump the version in sw.js so
    the service worker deploys a fresh cache. */
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 // Newest first. The "What's New" modal reads from this data — never hardcode
 // release notes in the modal itself. Mirror of CHANGELOG.md.
 const CHANGELOG = [
+  { version: '1.4', date: '2026-08-30', changes: {
+    Added: [
+      "Playlists you name starting with 💿 now count as albums, so you can rate CDs that aren't on Spotify by recreating them song by song. Reload albums after making one.",
+    ],
+  }},
   { version: '1.3', date: '2026-08-30', changes: {
     Added: [
       "Jump forward 15 seconds in the current song (next to the existing back-15s button).",
@@ -452,6 +457,23 @@ async function loadLibrary(force = false) {
         tracks.push({ uri: t.uri, id: t.id, name: t.name, artists: (t.artists||[]).map(a=>a.name).join(', '), album: al.name, albumId: al.id, albumArtist: (al.artists||[]).map(a=>a.name).join(', '), img, dur: t.duration_ms, disc: t.disc_number, no: t.track_number, added: it.added_at });
       }
     }
+    // Also treat playlists named "💿 …" as albums (CDs that don't exist on Spotify, recreated song by song)
+    try {
+      $('loadingText').textContent = 'Loading 💿 recreated CDs…';
+      const meNow = me || await api('GET', '/me');
+      const lists = await pageAll('/me/playlists', { limit: 50 });
+      for (const pl of lists) {
+        if (!pl || !pl.name || !pl.name.startsWith('💿') || !pl.owner || pl.owner.id !== meNow.id) continue;
+        const items = await pageAll(`/playlists/${pl.id}/items`, { limit: 50 });
+        const plImg = (pl.images && pl.images[0] && pl.images[0].url) || '';
+        let n = 0;
+        for (const it of items) {
+          const t = it && (it.item || it.track); if (!t || t.is_local || !t.uri || t.type === 'episode') continue;
+          const img = (t.album && t.album.images && (t.album.images[1] || t.album.images[0]) || {}).url || plImg;
+          tracks.push({ uri: t.uri, id: t.id, name: t.name, artists: (t.artists||[]).map(a=>a.name).join(', '), album: pl.name.replace(/^💿\s*/, ''), albumId: 'pl:' + pl.id, albumArtist: '', img, dur: t.duration_ms, disc: 1, no: ++n, added: it.added_at, fromPlaylist: true });
+        }
+      }
+    } catch (e) { console.warn('💿 playlists', e); }
     store.set('libraryCache', { at: Date.now(), tracks });
   }
   trackByUri = new Map(tracks.map(t => [t.uri, t]));
